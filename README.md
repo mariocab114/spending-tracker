@@ -66,9 +66,16 @@ Example response:
 }
 ```
 
-Returns `400` with an error message if no file is sent, the file isn't a valid CSV, or required columns are missing.
+Returns 400 with an error message if no file is sent, the file isn't a .csv, it can't be read as a CSV, or required columns are missing. Returns 413 if the file is over 1 MB.
 
 **`GET /api/health`**: returns `{"status": "ok"}`.
+
+## Security
+
+- CORS restricted to the front end's origin
+- Uploads capped at 1 MB and limited to `.csv` files
+- Flask debug mode off by default (enable with `FLASK_DEBUG=1`)
+- React escapes all rendered text, preventing script injection from transaction descriptions
 
 ## Running Tests
 
@@ -76,7 +83,7 @@ Returns `400` with an error message if no file is sent, the file isn't a valid C
 python -m unittest -v
 ```
 
-The tests use Flask's test client to cover successful categorization, missing files, and missing columns.
+The tests use Flask's test client to cover successful categorization, missing files, missing columns, non-CSV uploads, and files over the 1 MB limit.
 
 ## License
 
