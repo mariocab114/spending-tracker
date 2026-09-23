@@ -1,12 +1,24 @@
+import os
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import pandas as pd
 from categorizer import categorize
 
 app = Flask(__name__)
-CORS(app)  # lets the React page (different port) call this API
+
+# Reject uploads bigger than 1 MB so a huge file can't freeze the server
+app.config["MAX_CONTENT_LENGTH"] = 1 * 1024 * 1024
+
+# Only the React front end is allowed to call this API
+CORS(app, origins=["http://localhost:5173", "http://127.0.0.1:5173"])
 
 REQUIRED_COLUMNS = {"description", "amount"}
+
+
+@app.errorhandler(413)
+def file_too_large(error):
+    return jsonify({"error": "File is too large (max 1 MB)."}), 413
 
 
 @app.route("/api/health")
@@ -20,25 +32,30 @@ def categorize_transactions():
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
 
-    # 2. Read the CSV with pandas
+    # 2. Only accept .csv files
+    file = request.files["file"]
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        return jsonify({"error": "Please upload a .csv file"}), 400
+
+    # 3. Read the CSV with pandas
     try:
-        df = pd.read_csv(request.files["file"])
+        df = pd.read_csv(file)
     except Exception:
         return jsonify({"error": "Could not read the file as a CSV"}), 400
 
-    # 3. Check the columns we need are there
+    # 4. Check the columns we need are there
     missing = REQUIRED_COLUMNS - set(df.columns)
     if missing:
         return jsonify({"error": f"Missing columns: {', '.join(sorted(missing))}"}), 400
 
-    # 4. Clean the data: amounts must be numbers, skip rows missing either field
+    # 5. Clean the data: amounts must be numbers, skip rows missing either field
     df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
     df = df.dropna(subset=["description", "amount"])
 
-    # 5. Categorize using your existing categorizer
+    # 6. Categorize using the existing categorizer
     df["category"] = df["description"].astype(str).apply(categorize)
 
-    # 6. Total spending per category, biggest first
+    # 7. Total spending per category, biggest first
     totals = df.groupby("category")["amount"].sum().round(2).sort_values(ascending=False)
 
     return jsonify({
@@ -52,4 +69,6 @@ def categorize_transactions():
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    # Debug mode is off unless you turn it on with FLASK_DEBUG=1
+    debug = os.environ.get("FLASK_DEBUG") == "1"
+    app.run(host="127.0.0.1", port=5000, debug=debug)

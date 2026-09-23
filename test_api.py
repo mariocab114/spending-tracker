@@ -43,6 +43,18 @@ class TestCategorizeAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("description", response.get_json()["error"])
 
+    def test_non_csv_file_returns_400(self):
+        data = {"file": (io.BytesIO(b"hello"), "notes.txt")}
+        response = self.client.post(
+            "/api/categorize", data=data, content_type="multipart/form-data"
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_file_too_large_returns_413(self):
+        big_csv = "date,description,amount\n" + "2026-08-01,Starbucks,5.00\n" * 60000
+        response = self.post_csv(big_csv)
+        self.assertEqual(response.status_code, 413)
 
 if __name__ == "__main__":
     unittest.main()
+

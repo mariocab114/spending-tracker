@@ -35,6 +35,11 @@ function App() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    if (file.size > 1024 * 1024) {
+      setError("File is too large (max 1 MB).");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setData(null);
